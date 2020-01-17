@@ -4,6 +4,7 @@ class Sphere extends THREE.Mesh {
     this.position.x = x;
     this.position.y = y;
     this.position.z = z;
+    this.outgoingLines = [];
   }
 }
 
@@ -12,51 +13,45 @@ class Cube extends THREE.Object3D {
     super(new THREE.Group());
     this.edges = [[0, 1], [1, 3], [2, 0], [3, 2], [4, 5], [5, 7], [6, 4], [7, 6], [0, 4], [1, 5], [2, 6], [3, 7]]; // Serial numbers of spheres (in 'this.spheres' array) which mast be connected with edge lines
     this.spheres = [];
-    this.lines = [];
 
+    // Creates spheres at cube's tops
     let hue = Math.floor(Math.random() * 361);
     for (let x = centerX - 0.5; x < centerX + 1; x += 1) {
       for (let y = centerY - 0.5; y < centerY + 1; y += 1) {
         for (let z = centerZ - 0.5; z < centerZ + 1; z += 1) {
           let sphereColor = `hsl(${hue}, 100%, 50%)`;
-          this.add(new Sphere(x, y, z, sphereColor));
-          this.spheres.push({x: x, y: y, z: z, color: sphereColor});
+          let currentSphere = new Sphere(x, y, z, sphereColor);
+          this.add(currentSphere);
+          this.spheres.push(currentSphere);
           hue += 45;
         }
       }
     }
 
+    // Creates cube's edges
     this.edges.forEach((verticesPair) => {
-      let geometry = new THREE.Geometry();
-      geometry.vertices.push(
-        new THREE.Vector3(this.spheres[verticesPair[0]].x, this.spheres[verticesPair[0]].y, this.spheres[verticesPair[0]].z),
-        new THREE.Vector3(this.spheres[verticesPair[1]].x, this.spheres[verticesPair[1]].y, this.spheres[verticesPair[1]].z)
-      );
-      const line = new THREE.Line( geometry, new THREE.LineBasicMaterial({color: 0x000000}));
-      this.add(line);
+      const geometry = new THREE.Geometry();
+      const vertice0 = this.spheres[verticesPair[0]].position;
+      const vertice1 = this.spheres[verticesPair[1]].position;
 
-      this.lines.push({
-        vertices: geometry.vertices,
-        line,
-      });
+      geometry.vertices.push(
+        new THREE.Vector3(vertice0.x, vertice0.y, vertice0.z),
+        new THREE.Vector3(vertice1.x, vertice1.y, vertice1.z)
+      );
+      const currentLine = new THREE.Line( geometry, new THREE.LineBasicMaterial({color: 0x000000}));
+      this.add(currentLine);
+      
+      this.spheres[verticesPair[0]].outgoingLines.push(currentLine);
+      this.spheres[verticesPair[1]].outgoingLines.push(currentLine);
     });
   }
 
   setEdgesColor(intersects) {
     for (let i = 0; i < intersects.length; i++) {
       if (intersects[i].object instanceof Sphere) {
-        console.log("123");
-        this.lines.forEach(({vertices: item, line}) => {
-          if ((item[0].x === intersects[i].object.position.x &&
-            item[0].y === intersects[i].object.position.y &&
-            item[0].z === intersects[i].object.position.z)
-            ||
-            (item[1].x === intersects[i].object.position.x &&
-            item[1].y === intersects[i].object.position.y &&
-            item[1].z === intersects[i].object.position.z)) {
-              line.material.color.set(intersects[i].object.material.color);
-          }
-        });
+        intersects[i].object.outgoingLines[0].material.color.set(intersects[i].object.material.color);
+        intersects[i].object.outgoingLines[1].material.color.set(intersects[i].object.material.color);
+        intersects[i].object.outgoingLines[2].material.color.set(intersects[i].object.material.color);
         break;
       }
     }
@@ -85,7 +80,7 @@ function createCubes(quantityOfCubes) {
   for(let i = 0; i < quantityOfCubes; i++) {
     const cube = new Cube(getRandomValue(), getRandomValue(), getRandomValue());
     scene.add(cube);
-    cube.rotate(getRandomValue()/2);
+    cube.rotate(getRandomValue()/4 + getRandomValue()/4);
 
     cubes.push(cube);
   }
@@ -95,6 +90,8 @@ function createCubes(quantityOfCubes) {
 
 const raycaster = new THREE.Raycaster();
 const mouse = new THREE.Vector2();
+let isAlreadyColored = false;
+
 
 function onMouseMove(event) {
 	// calculate mouse position in normalized device coordinates
@@ -114,6 +111,9 @@ function onMouseMove(event) {
 const animate = () => {
   requestAnimationFrame(animate);
   renderer.render(scene, camera);
+
+  // scene.rotation.x += 0.0005;
+  // scene.rotation.y += 0.0005;
 };
 
 window.addEventListener('click', onMouseMove, false);
